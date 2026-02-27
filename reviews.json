@@ -1,0 +1,3 @@
+{
+  "note": "Backend keeps reviews in-memory during runtime. Use /export to persist externally."
+}

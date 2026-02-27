@@ -1,0 +1,922 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Argus Labeler</title>
+    <style>
+      :root {
+        --bg: #f5f7fb;
+        --card: #ffffff;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --border: #dbe2ea;
+        --green: #16a34a;
+        --yellow: #ca8a04;
+        --blue: #2563eb;
+        --danger: #dc2626;
+      }
+
+      [data-theme="dark"] {
+        --bg: #0b1220;
+        --card: #121a2b;
+        --text: #e5e7eb;
+        --muted: #9ca3af;
+        --border: #243041;
+        --green: #22c55e;
+        --yellow: #eab308;
+        --blue: #60a5fa;
+        --danger: #f87171;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family:
+          Inter,
+          system-ui,
+          -apple-system,
+          Segoe UI,
+          Roboto,
+          sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        transition: background-color 0.2s ease;
+      }
+
+      .container {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 16px;
+      }
+
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 14px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+      }
+
+      .top-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .title {
+        margin: 0;
+        font-size: 1.1rem;
+      }
+
+      .theme-toggle {
+        background: transparent;
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        min-height: 36px;
+        padding: 6px 12px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      #progress {
+        margin-bottom: 8px;
+        font-weight: 600;
+      }
+
+      .progress-track {
+        width: 100%;
+        height: 8px;
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--border) 75%, transparent);
+        overflow: hidden;
+        margin-bottom: 10px;
+      }
+
+      .progress-fill {
+        width: 0%;
+        height: 100%;
+        background: linear-gradient(90deg, var(--blue), var(--green));
+        transition: width 0.2s ease;
+      }
+
+      .status-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .status-badge {
+        font-size: 12px;
+        color: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 4px 10px;
+      }
+
+      .images {
+        display: grid;
+        place-items: center;
+        margin-bottom: 12px;
+      }
+
+      .stack {
+        position: relative;
+        width: 320px;
+        height: 320px;
+        display: grid;
+        place-items: center;
+      }
+
+      canvas {
+        border-radius: 50%;
+        border: 1px solid var(--border);
+        background: #ffffff;
+        touch-action: none;
+      }
+
+      #outerCanvas {
+        position: absolute;
+        width: 280px;
+        height: 280px;
+        z-index: 1;
+      }
+
+      #innerCanvas {
+        position: absolute;
+        width: 170px;
+        height: 170px;
+        z-index: 2;
+      }
+
+      .info {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 8px;
+        font-weight: 600;
+        margin: 8px 0;
+      }
+
+      .muted {
+        color: var(--muted);
+        font-weight: 500;
+      }
+
+      .slider-wrap {
+        margin: 12px 0 14px;
+      }
+
+      input[type="range"] {
+        width: 100%;
+        height: 42px;
+        cursor: pointer;
+        accent-color: var(--blue);
+      }
+
+      .actions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 10px;
+      }
+
+      .slider-labels {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 4px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      button {
+        border: 0;
+        border-radius: 12px;
+        min-height: 74px;
+        font-size: 14px;
+        font-weight: 700;
+        color: white;
+        cursor: pointer;
+        transition:
+          opacity 0.2s ease,
+          transform 0.1s ease;
+        padding: 10px 12px;
+        text-align: left;
+      }
+
+      button:hover {
+        opacity: 0.92;
+      }
+      button:focus-visible,
+      .theme-toggle:focus-visible,
+      input[type="range"]:focus-visible {
+        outline: 3px solid color-mix(in oklab, var(--blue) 40%, transparent);
+        outline-offset: 2px;
+      }
+      button:active {
+        transform: translateY(1px);
+      }
+      button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      #btn-confirm {
+        background: var(--green);
+      }
+      #btn-adjust {
+        background: var(--yellow);
+        color: var(--text);
+      }
+      #btn-skip {
+        background: #64748b;
+      }
+
+      .action-title {
+        display: block;
+        font-size: 16px;
+        line-height: 1.2;
+      }
+
+      .action-sub {
+        display: block;
+        font-size: 12px;
+        margin-top: 4px;
+        opacity: 0.92;
+        font-weight: 600;
+      }
+
+      .action-help {
+        margin-top: 10px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .feedback {
+        margin-top: 8px;
+        min-height: 20px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .feedback.ok {
+        color: var(--green);
+      }
+
+      .feedback.warn {
+        color: var(--yellow);
+      }
+
+      .screen {
+        min-height: 60vh;
+        display: grid;
+        place-items: center;
+        text-align: center;
+        padding: 24px;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      .status-success {
+        color: var(--green);
+        font-weight: 700;
+      }
+      .status-warn {
+        color: var(--yellow);
+        font-weight: 700;
+      }
+      .status-error {
+        color: var(--danger);
+        font-weight: 700;
+      }
+
+      a {
+        color: var(--blue);
+        font-weight: 600;
+      }
+
+      @media (max-width: 768px) {
+        .container {
+          padding: 12px;
+        }
+
+        .card {
+          padding: 12px;
+        }
+
+        .top-row {
+          align-items: stretch;
+        }
+
+        .theme-toggle {
+          width: 100%;
+        }
+
+        .stack {
+          width: 280px;
+          height: 280px;
+        }
+
+        #outerCanvas {
+          width: 250px;
+          height: 250px;
+        }
+
+        #innerCanvas {
+          width: 148px;
+          height: 148px;
+        }
+
+        .actions {
+          grid-template-columns: 1fr;
+        }
+
+        button {
+          min-height: 64px;
+        }
+      }
+
+      @media (max-width: 420px) {
+        .stack {
+          width: 240px;
+          height: 240px;
+        }
+
+        #outerCanvas {
+          width: 220px;
+          height: 220px;
+        }
+
+        #innerCanvas {
+          width: 128px;
+          height: 128px;
+        }
+
+        .title {
+          font-size: 1rem;
+        }
+
+        input[type="range"] {
+          height: 48px;
+        }
+
+        .info {
+          flex-direction: column;
+          gap: 4px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="invalid-key" class="screen hidden">
+      <div class="card">
+        <h2 class="status-error">Chave inválida</h2>
+        <p>
+          Não foi possível autenticar no backend. Verifique o parâmetro
+          <strong>?key=</strong> na URL.
+        </p>
+      </div>
+    </div>
+
+    <div id="app" class="container hidden">
+      <div class="card">
+        <div class="top-row">
+          <h1 class="title">Argus Labeler</h1>
+          <button id="themeToggle" class="theme-toggle" type="button">
+            🌙 Tema escuro
+          </button>
+        </div>
+        <div id="progress">Carregando progresso...</div>
+        <div class="progress-track" aria-hidden="true">
+          <div id="progressFill" class="progress-fill"></div>
+        </div>
+        <div class="muted" id="sample-id">Amostra: --</div>
+        <div class="status-row" style="margin-top: 6px">
+          <div class="muted" id="shortcut-hint">
+            Atalhos: Enter = confirmar | S = ajustar | P = pular | ←/→ = ajustar
+            slider
+          </div>
+          <div id="ui-status" class="status-badge">Pronto</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 12px">
+        <div class="images">
+          <div class="stack">
+            <canvas id="outerCanvas" width="280" height="280"></canvas>
+            <canvas id="innerCanvas" width="280" height="280"></canvas>
+          </div>
+          <div class="muted" style="text-align: center; margin-top: 8px">
+            outer (anti-horário) com inner (horário) centralizado
+          </div>
+        </div>
+
+        <div class="info">
+          <div id="angle-current">Ângulo atual: --</div>
+          <div id="angle-original" class="muted">Original: --</div>
+          <div id="angle-delta" class="muted">Ajuste: --</div>
+        </div>
+
+        <div class="slider-wrap">
+          <input
+            id="angleSlider"
+            type="range"
+            min="0"
+            max="360"
+            step="0.1"
+            value="0"
+          />
+          <div class="slider-labels">
+            <span>0°</span>
+            <span>180°</span>
+            <span>360°</span>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="btn-confirm" type="button">
+            <span class="action-title">✅ Confirmar Ângulo</span>
+            <span class="action-sub">Mantém exatamente como está</span>
+          </button>
+          <button id="btn-adjust" type="button">
+            <span class="action-title">🔧 Salvar Novo Ângulo</span>
+            <span class="action-sub">Usa o valor atual do slider</span>
+          </button>
+          <button id="btn-skip" type="button">
+            <span class="action-title">⏭️ Pular Amostra</span>
+            <span class="action-sub">Não altera, segue para próxima</span>
+          </button>
+        </div>
+        <div class="action-help">
+          Verde = confirmou | Amarelo = ajustou | Cinza = pulou
+        </div>
+        <div id="feedback" class="feedback"></div>
+      </div>
+    </div>
+
+    <div id="done" class="screen hidden">
+      <div class="card">
+        <h2 class="status-success">Revisão concluída 🎉</h2>
+        <p>Todas as amostras foram processadas.</p>
+        <p>
+          <a id="export-link" href="#" target="_blank" rel="noreferrer"
+            >Baixar reviews via /export</a
+          >
+        </p>
+      </div>
+    </div>
+
+    <script>
+      const BACKEND_URL = "http://127.0.0.1:8000";
+
+      const key = new URLSearchParams(window.location.search).get("key") || "";
+      const api = (path) =>
+        `${BACKEND_URL}${path}${path.includes("?") ? "&" : "?"}key=${encodeURIComponent(key)}`;
+
+      const REVIEWER_KEY = "argus_labeler_reviewer_id";
+      function getReviewerId() {
+        let reviewerId = localStorage.getItem(REVIEWER_KEY);
+        if (!reviewerId) {
+          reviewerId = `reviewer-${Math.random().toString(36).slice(2, 10)}`;
+          localStorage.setItem(REVIEWER_KEY, reviewerId);
+        }
+        return reviewerId;
+      }
+      const reviewerId = getReviewerId();
+
+      const appEl = document.getElementById("app");
+      const invalidKeyEl = document.getElementById("invalid-key");
+      const doneEl = document.getElementById("done");
+      const exportLink = document.getElementById("export-link");
+
+      const progressEl = document.getElementById("progress");
+      const progressFill = document.getElementById("progressFill");
+      const sampleIdEl = document.getElementById("sample-id");
+      const angleCurrentEl = document.getElementById("angle-current");
+      const angleOriginalEl = document.getElementById("angle-original");
+      const angleDeltaEl = document.getElementById("angle-delta");
+      const themeToggle = document.getElementById("themeToggle");
+      const uiStatusEl = document.getElementById("ui-status");
+      const feedbackEl = document.getElementById("feedback");
+
+      const slider = document.getElementById("angleSlider");
+      const btnConfirm = document.getElementById("btn-confirm");
+      const btnAdjust = document.getElementById("btn-adjust");
+      const btnSkip = document.getElementById("btn-skip");
+
+      const innerCanvas = document.getElementById("innerCanvas");
+      const outerCanvas = document.getElementById("outerCanvas");
+      const innerCtx = innerCanvas.getContext("2d");
+      const outerCtx = outerCanvas.getContext("2d");
+
+      let current = null;
+      let claimedQueue = [];
+      let prefetchedSampleData = null;
+
+      let innerImage = null;
+      let outerImage = null;
+      let currentAngle = 0;
+      let originalAngle = 0;
+      let rafPending = false;
+
+      const THEME_KEY = "argus_labeler_theme";
+
+      const toFixed1 = (v) => Number(v).toFixed(1);
+
+      function setUiStatus(text) {
+        uiStatusEl.textContent = text;
+      }
+
+      function setFeedback(text, mode = "") {
+        feedbackEl.textContent = text || "";
+        feedbackEl.classList.remove("ok", "warn");
+        if (mode) feedbackEl.classList.add(mode);
+      }
+
+      function setInvalidKey() {
+        appEl.classList.add("hidden");
+        doneEl.classList.add("hidden");
+        invalidKeyEl.classList.remove("hidden");
+      }
+
+      function showApp() {
+        invalidKeyEl.classList.add("hidden");
+        doneEl.classList.add("hidden");
+        appEl.classList.remove("hidden");
+      }
+
+      function showDone() {
+        appEl.classList.add("hidden");
+        invalidKeyEl.classList.add("hidden");
+        doneEl.classList.remove("hidden");
+        exportLink.href = api("/export");
+      }
+
+      function setTheme(theme) {
+        document.documentElement.setAttribute("data-theme", theme);
+        const isDark = theme === "dark";
+        themeToggle.textContent = isDark ? "☀️ Tema claro" : "🌙 Tema escuro";
+      }
+
+      function initTheme() {
+        const saved = localStorage.getItem(THEME_KEY);
+        const prefersDark =
+          window.matchMedia &&
+          window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const startTheme = saved || (prefersDark ? "dark" : "light");
+        setTheme(startTheme);
+
+        themeToggle.addEventListener("click", () => {
+          const currentTheme =
+            document.documentElement.getAttribute("data-theme") || "light";
+          const nextTheme = currentTheme === "dark" ? "light" : "dark";
+          setTheme(nextTheme);
+          localStorage.setItem(THEME_KEY, nextTheme);
+        });
+      }
+
+      async function fetchJson(path) {
+        const response = await fetch(api(path));
+        if (response.status === 401) {
+          setInvalidKey();
+          throw new Error("UNAUTHORIZED");
+        }
+        if (!response.ok) {
+          throw new Error(`Erro ${response.status} em ${path}`);
+        }
+        return response.json();
+      }
+
+      function loadImage(url) {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.onload = () => resolve(img);
+          img.onerror = () =>
+            reject(new Error(`Falha ao carregar imagem: ${url}`));
+          img.src = url;
+        });
+      }
+
+      function drawCircular(ctx, img, angleDeg) {
+        const size = ctx.canvas.width;
+        const r = size / 2;
+        ctx.clearRect(0, 0, size, size);
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(r, r, r - 1, 0, Math.PI * 2);
+        ctx.clip();
+
+        ctx.translate(r, r);
+        ctx.rotate((angleDeg * Math.PI) / 180);
+
+        const scale = Math.max(size / img.width, size / img.height);
+        const w = img.width * scale;
+        const h = img.height * scale;
+        ctx.drawImage(img, -w / 2, -h / 2, w, h);
+        ctx.restore();
+      }
+
+      function renderNow() {
+        if (!innerImage || !outerImage) return;
+        drawCircular(innerCtx, innerImage, currentAngle);
+        drawCircular(outerCtx, outerImage, -currentAngle);
+
+        const delta = currentAngle - originalAngle;
+        const signal = delta >= 0 ? "+" : "";
+        angleCurrentEl.textContent = `Ângulo atual: ${toFixed1(currentAngle)}°`;
+        angleDeltaEl.textContent = `Ajuste: ${signal}${toFixed1(delta)}°`;
+      }
+
+      function requestRender() {
+        if (rafPending) return;
+        rafPending = true;
+        requestAnimationFrame(() => {
+          rafPending = false;
+          renderNow();
+        });
+      }
+
+      function disableActions(state) {
+        btnConfirm.disabled = state;
+        btnAdjust.disabled = state;
+        btnSkip.disabled = state;
+        slider.disabled = state;
+        setUiStatus(state ? "Processando..." : "Pronto");
+      }
+
+      async function updateProgress() {
+        const p = await fetchJson("/progress");
+        const reviewed = p.confirmed + p.adjusted + p.skipped;
+        progressEl.textContent = `${reviewed} revisados | ${p.confirmed} confirmados | ${p.adjusted} ajustados | ${p.skipped} pulados | ${p.remaining} restantes`;
+        const pct = p.total > 0 ? (reviewed / p.total) * 100 : 0;
+        progressFill.style.width = `${Math.min(100, Math.max(0, pct)).toFixed(1)}%`;
+      }
+
+      async function loadSampleData(sample) {
+        const timestamp = sample.timestamp;
+        const innerUrl =
+          sample.inner_url ||
+          api(`/image/${encodeURIComponent(timestamp)}_inner.jpg`);
+        const outerUrl =
+          sample.outer_url ||
+          api(`/image/${encodeURIComponent(timestamp)}_outer.jpg`);
+
+        const [inImg, outImg] = await Promise.all([
+          loadImage(innerUrl),
+          loadImage(outerUrl),
+        ]);
+
+        return {
+          timestamp,
+          angle_original: Number(sample.angle_original),
+          inner: inImg,
+          outer: outImg,
+        };
+      }
+
+      async function getNextClaimedSample() {
+        const exclude = [
+          ...(current?.timestamp ? [current.timestamp] : []),
+          ...claimedQueue.map((item) => item.timestamp),
+          ...(prefetchedSampleData?.sample?.timestamp
+            ? [prefetchedSampleData.sample.timestamp]
+            : []),
+        ].join(",");
+
+        const response = await fetchJson(
+          `/next-sample?reviewer_id=${encodeURIComponent(reviewerId)}&exclude=${encodeURIComponent(exclude)}`,
+        );
+        if (response && response.sample === null) {
+          return null;
+        }
+        return response;
+      }
+
+      async function getNextClaimedSamplesBatch(count = 5) {
+        const exclude = [
+          ...(current?.timestamp ? [current.timestamp] : []),
+          ...claimedQueue.map((item) => item.timestamp),
+          ...(prefetchedSampleData?.sample?.timestamp
+            ? [prefetchedSampleData.sample.timestamp]
+            : []),
+        ].join(",");
+
+        const response = await fetchJson(
+          `/next-samples?reviewer_id=${encodeURIComponent(reviewerId)}&count=${count}&exclude=${encodeURIComponent(exclude)}`,
+        );
+        return Array.isArray(response) ? response : [];
+      }
+
+      async function ensureQueue(target = 5) {
+        if (claimedQueue.length >= target) return;
+        const needed = target - claimedQueue.length;
+        const batch = await getNextClaimedSamplesBatch(needed);
+        if (batch.length > 0) {
+          claimedQueue.push(...batch);
+        }
+      }
+
+      async function prefetchNextSampleData() {
+        if (claimedQueue.length === 0) {
+          prefetchedSampleData = null;
+          return;
+        }
+
+        const next = claimedQueue[0];
+        if (prefetchedSampleData?.sample?.timestamp === next.timestamp) {
+          return;
+        }
+
+        try {
+          const data = await loadSampleData(next);
+          prefetchedSampleData = { sample: next, data };
+        } catch {
+          prefetchedSampleData = null;
+        }
+      }
+
+      async function showNextSample() {
+        setUiStatus("Buscando próxima...");
+        await ensureQueue(1);
+
+        let sample = null;
+        let data = null;
+
+        if (prefetchedSampleData) {
+          const firstQueue = claimedQueue[0];
+          if (
+            firstQueue &&
+            prefetchedSampleData.sample.timestamp === firstQueue.timestamp
+          ) {
+            sample = claimedQueue.shift();
+            data = prefetchedSampleData.data;
+            prefetchedSampleData = null;
+          }
+        } else {
+          sample = claimedQueue.shift() || null;
+          if (sample) data = await loadSampleData(sample);
+        }
+
+        if (!sample || !data) {
+          sample = claimedQueue.shift() || (await getNextClaimedSample());
+          if (sample) data = await loadSampleData(sample);
+        }
+
+        if (!sample || !data) {
+          await updateProgress();
+          showDone();
+          return;
+        }
+
+        disableActions(true);
+
+        current = sample;
+        sampleIdEl.textContent = `Amostra: ${data.timestamp}`;
+
+        const parsedOriginal = Number(data.angle_original);
+        originalAngle = Number.isFinite(parsedOriginal) ? parsedOriginal : 0;
+        currentAngle = originalAngle;
+        slider.value = String(currentAngle);
+        angleOriginalEl.textContent = `Original: ${toFixed1(originalAngle)}°`;
+
+        innerImage = data.inner;
+        outerImage = data.outer;
+
+        requestRender();
+        disableActions(false);
+        ensureQueue(5);
+        prefetchNextSampleData();
+        setUiStatus("Pronto");
+        setFeedback("", "");
+      }
+
+      async function sendReview(action) {
+        if (!current) return;
+        disableActions(true);
+
+        try {
+          const payload = {
+            timestamp: current.timestamp,
+            angle: Number(currentAngle),
+            angle_original: Number(originalAngle),
+            action,
+          };
+
+          const response = await fetch(api("/review"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          if (response.status === 401) {
+            setInvalidKey();
+            return;
+          }
+
+          if (!response.ok) {
+            const text = await response.text();
+            throw new Error(text || `Erro ${response.status}`);
+          }
+
+          const actionText =
+            action === "confirmed"
+              ? "Confirmado"
+              : action === "adjusted"
+                ? "Ajuste salvo"
+                : "Amostra pulada";
+          const mode = action === "adjusted" ? "warn" : "ok";
+          setFeedback(`✔ ${actionText}`, mode);
+
+          await updateProgress();
+          await showNextSample();
+        } catch (error) {
+          disableActions(false);
+          setUiStatus("Erro");
+          setFeedback(`Falha ao salvar: ${error.message}`, "warn");
+          alert(`Falha ao salvar review: ${error.message}`);
+        }
+      }
+
+      slider.addEventListener("input", () => {
+        currentAngle = Number(slider.value);
+        requestRender();
+      });
+
+      btnConfirm.addEventListener("click", () => sendReview("confirmed"));
+      btnAdjust.addEventListener("click", () => sendReview("adjusted"));
+      btnSkip.addEventListener("click", () => sendReview("skipped"));
+
+      document.addEventListener("keydown", (event) => {
+        if (invalidKeyEl.classList.contains("hidden") === false) return;
+        if (doneEl.classList.contains("hidden") === false) return;
+
+        const tag = document.activeElement?.tagName?.toLowerCase();
+        if (tag === "input" && document.activeElement !== slider) return;
+
+        if (event.key === "Enter" && !btnConfirm.disabled) {
+          event.preventDefault();
+          sendReview("confirmed");
+          return;
+        }
+
+        if ((event.key === "s" || event.key === "S") && !btnAdjust.disabled) {
+          event.preventDefault();
+          sendReview("adjusted");
+          return;
+        }
+
+        if ((event.key === "p" || event.key === "P") && !btnSkip.disabled) {
+          event.preventDefault();
+          sendReview("skipped");
+          return;
+        }
+
+        if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+          event.preventDefault();
+          const step = event.shiftKey ? 5 : 1;
+          const direction = event.key === "ArrowRight" ? 1 : -1;
+          const next = Number(slider.value) + direction * step;
+          const wrapped = ((next % 360) + 360) % 360;
+          slider.value = wrapped.toFixed(1);
+          currentAngle = Number(slider.value);
+          requestRender();
+        }
+      });
+
+      async function init() {
+        initTheme();
+
+        if (!key) {
+          setInvalidKey();
+          return;
+        }
+
+        try {
+          showApp();
+          await updateProgress();
+          await showNextSample();
+        } catch (error) {
+          if (error.message !== "UNAUTHORIZED") {
+            console.error(error);
+            alert(
+              "Erro ao inicializar a aplicação. Verifique BACKEND_URL e conectividade.",
+            );
+          }
+        }
+      }
+
+      init();
+    </script>
+  </body>
+</html>
