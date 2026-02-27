@@ -228,9 +228,6 @@
         cursor: not-allowed;
       }
 
-      #btn-confirm {
-        background: var(--danger);
-      }
       #btn-adjust {
         background: var(--green);
         color: white;
@@ -402,8 +399,7 @@
         <div class="muted" id="sample-id">Amostra: --</div>
         <div class="status-row" style="margin-top: 6px">
           <div class="muted" id="shortcut-hint">
-            Atalhos: Enter = confirmar | S = ajustar | P = pular | ←/→ = ajustar
-            slider
+            Atalhos: S = ajustar | P = pular | ←/→ = ajustar slider
           </div>
           <div id="ui-status" class="status-badge">Pronto</div>
         </div>
@@ -443,10 +439,12 @@
         </div>
 
         <div class="actions">
+          <!--
           <button id="btn-confirm" type="button">
-            <span class="action-title">🚨 Confirmar Ângulo (crítico)</span>
-            <span class="action-sub">Ação em vermelho, exige confirmação</span>
+            <span class="action-title">✅ Confirmar Ângulo</span>
+            <span class="action-sub">Mantém exatamente como está</span>
           </button>
+          -->
           <button id="btn-adjust" type="button">
             <span class="action-title">🔧 Salvar Novo Ângulo</span>
             <span class="action-sub">Usa o valor atual do slider</span>
@@ -456,9 +454,7 @@
             <span class="action-sub">Não altera, segue para próxima</span>
           </button>
         </div>
-        <div class="action-help">
-          Vermelho = confirmou | Verde = ajustou | Cinza = pulou
-        </div>
+        <div class="action-help">Verde = ajustou | Cinza = pulou</div>
         <div id="feedback" class="feedback"></div>
       </div>
     </div>
@@ -509,7 +505,6 @@
       const feedbackEl = document.getElementById("feedback");
 
       const slider = document.getElementById("angleSlider");
-      const btnConfirm = document.getElementById("btn-confirm");
       const btnAdjust = document.getElementById("btn-adjust");
       const btnSkip = document.getElementById("btn-skip");
 
@@ -649,7 +644,6 @@
       }
 
       function disableActions(state) {
-        btnConfirm.disabled = state;
         btnAdjust.disabled = state;
         btnSkip.disabled = state;
         slider.disabled = state;
@@ -886,7 +880,6 @@
         requestRender();
       });
 
-      btnConfirm.addEventListener("click", () => sendReview("confirmed"));
       btnAdjust.addEventListener("click", () => sendReview("adjusted"));
       btnSkip.addEventListener("click", () => sendReview("skipped"));
 
@@ -896,12 +889,6 @@
 
         const tag = document.activeElement?.tagName?.toLowerCase();
         if (tag === "input" && document.activeElement !== slider) return;
-
-        if (event.key === "Enter" && !btnConfirm.disabled) {
-          event.preventDefault();
-          sendReview("confirmed");
-          return;
-        }
 
         if ((event.key === "s" || event.key === "S") && !btnAdjust.disabled) {
           event.preventDefault();
