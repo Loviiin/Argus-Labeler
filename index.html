@@ -229,11 +229,11 @@
       }
 
       #btn-confirm {
-        background: var(--green);
+        background: var(--danger);
       }
       #btn-adjust {
-        background: var(--yellow);
-        color: var(--text);
+        background: var(--green);
+        color: white;
       }
       #btn-skip {
         background: #64748b;
@@ -444,8 +444,8 @@
 
         <div class="actions">
           <button id="btn-confirm" type="button">
-            <span class="action-title">✅ Confirmar Ângulo</span>
-            <span class="action-sub">Mantém exatamente como está</span>
+            <span class="action-title">🚨 Confirmar Ângulo (crítico)</span>
+            <span class="action-sub">Ação em vermelho, exige confirmação</span>
           </button>
           <button id="btn-adjust" type="button">
             <span class="action-title">🔧 Salvar Novo Ângulo</span>
@@ -457,7 +457,7 @@
           </button>
         </div>
         <div class="action-help">
-          Verde = confirmou | Amarelo = ajustou | Cinza = pulou
+          Vermelho = confirmou | Verde = ajustou | Cinza = pulou
         </div>
         <div id="feedback" class="feedback"></div>
       </div>
@@ -476,7 +476,7 @@
     </div>
 
     <script>
-      const BACKEND_URL = "https://argus-labeler.onrender.com";
+      const BACKEND_URL = "http://127.0.0.1:8000";
 
       const key = new URLSearchParams(window.location.search).get("key") || "";
       const api = (path) =>
@@ -521,6 +521,7 @@
       let current = null;
       let claimedQueue = [];
       let prefetchedSampleData = null;
+      let includeReviewedMode = false;
 
       let innerImage = null;
       let outerImage = null;
@@ -695,7 +696,7 @@
         ].join(",");
 
         const response = await fetchJson(
-          `/next-sample?reviewer_id=${encodeURIComponent(reviewerId)}&exclude=${encodeURIComponent(exclude)}`,
+          `/next-sample?reviewer_id=${encodeURIComponent(reviewerId)}&include_reviewed=${includeReviewedMode}&exclude=${encodeURIComponent(exclude)}`,
         );
         if (response && response.sample === null) {
           return null;
@@ -713,7 +714,7 @@
         ].join(",");
 
         const response = await fetchJson(
-          `/next-samples?reviewer_id=${encodeURIComponent(reviewerId)}&count=${count}&exclude=${encodeURIComponent(exclude)}`,
+          `/next-samples?reviewer_id=${encodeURIComponent(reviewerId)}&count=${count}&include_reviewed=${includeReviewedMode}&exclude=${encodeURIComponent(exclude)}`,
         );
         return Array.isArray(response) ? response : [];
       }
@@ -774,8 +775,28 @@
         }
 
         if (!sample || !data) {
-          await updateProgress();
-          showDone();
+          if (!includeReviewedMode) {
+            includeReviewedMode = true;
+            claimedQueue = [];
+            prefetchedSampleData = null;
+            setUiStatus("Modo reverificação");
+            setFeedback(
+              "Fila principal concluída. Entrando em reverificação contínua desde o início.",
+              "ok",
+            );
+            await ensureQueue(5);
+            await prefetchNextSampleData();
+            return showNextSample();
+          }
+
+          setUiStatus("Aguardando amostras...");
+          setFeedback(
+            "Sem amostras livres no momento (podem estar em revisão por outros). Tentando novamente...",
+            "warn",
+          );
+          setTimeout(() => {
+            showNextSample();
+          }, 1500);
           return;
         }
 
@@ -803,6 +824,18 @@
 
       async function sendReview(action) {
         if (!current) return;
+
+        if (action === "confirmed") {
+          const confirmed = window.confirm(
+            "⚠️ Essa ação agora é crítica (botão vermelho). Tem certeza que deseja confirmar o ângulo atual?",
+          );
+          if (!confirmed) {
+            setFeedback("Confirmação cancelada.", "warn");
+            setUiStatus("Pronto");
+            return;
+          }
+        }
+
         disableActions(true);
 
         try {

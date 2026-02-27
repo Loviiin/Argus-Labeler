@@ -236,6 +236,7 @@ def _parse_exclude(exclude: Optional[str]) -> Set[str]:
 def _claim_next_samples(
     reviewer_id: str,
     count: int,
+    include_reviewed: bool = False,
     exclude: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     reviewed_ids = _get_reviewed_ids()
@@ -245,32 +246,37 @@ def _claim_next_samples(
     selected: List[Dict[str, Any]] = []
     selected_ids: Set[str] = set()
 
-    for timestamp in _reviewable_timestamps():
-        if len(selected) >= count:
-            break
-        if timestamp in reviewed_ids:
-            continue
-        if timestamp in excluded or timestamp in selected_ids:
-            continue
-        if _is_claimed_by_other(timestamp, reviewer_id):
-            continue
+    def _attempt_select(allow_reviewed: bool) -> None:
+        for timestamp in _reviewable_timestamps():
+            if len(selected) >= count:
+                break
+            if (not allow_reviewed) and (timestamp in reviewed_ids):
+                continue
+            if timestamp in excluded or timestamp in selected_ids:
+                continue
+            if _is_claimed_by_other(timestamp, reviewer_id):
+                continue
 
-        angle_original = float(_download_label_json(timestamp)["angle_original"])
-        claims_memory[timestamp] = {
-            "reviewer_id": reviewer_id,
-            "claimed_at": datetime.now(timezone.utc).timestamp(),
-        }
-
-        selected_ids.add(timestamp)
-        selected.append(
-            {
-                "timestamp": timestamp,
-                "angle_original": angle_original,
-                "reviewed": False,
-                "inner_url": _public_image_url(f"{timestamp}_inner.jpg"),
-                "outer_url": _public_image_url(f"{timestamp}_outer.jpg"),
+            angle_original = float(_download_label_json(timestamp)["angle_original"])
+            claims_memory[timestamp] = {
+                "reviewer_id": reviewer_id,
+                "claimed_at": datetime.now(timezone.utc).timestamp(),
             }
-        )
+
+            selected_ids.add(timestamp)
+            selected.append(
+                {
+                    "timestamp": timestamp,
+                    "angle_original": angle_original,
+                    "reviewed": timestamp in reviewed_ids,
+                    "inner_url": _public_image_url(f"{timestamp}_inner.jpg"),
+                    "outer_url": _public_image_url(f"{timestamp}_outer.jpg"),
+                }
+            )
+
+    _attempt_select(allow_reviewed=False)
+    if include_reviewed and len(selected) < count:
+        _attempt_select(allow_reviewed=True)
 
     return selected
 
@@ -301,10 +307,16 @@ def get_samples(_: str = Depends(verify_key)) -> List[Dict[str, Any]]:
 @app.get("/next-sample")
 def get_next_sample(
     reviewer_id: str = Query(..., min_length=2, description="Reviewer identifier"),
+    include_reviewed: bool = Query(default=False, description="Include already reviewed samples for reverification"),
     exclude: Optional[str] = Query(default=None, description="Comma-separated timestamps to skip"),
     _: str = Depends(verify_key),
 ) -> Dict[str, Any]:
-    items = _claim_next_samples(reviewer_id=reviewer_id, count=1, exclude=exclude)
+    items = _claim_next_samples(
+        reviewer_id=reviewer_id,
+        count=1,
+        include_reviewed=include_reviewed,
+        exclude=exclude,
+    )
     if items:
         return items[0]
 
@@ -315,12 +327,16 @@ def get_next_sample(
 def get_next_samples(
     reviewer_id: str = Query(..., min_length=2, description="Reviewer identifier"),
     count: int = Query(default=5, ge=1, le=20, description="Number of samples to claim"),
+    include_reviewed: bool = Query(default=False, description="Include already reviewed samples for reverification"),
     exclude: Optional[str] = Query(default=None, description="Comma-separated timestamps to skip"),
     _: str = Depends(verify_key),
 ) -> List[Dict[str, Any]]:
-    return _claim_next_samples(reviewer_id=reviewer_id, count=count, exclude=exclude)
-
-
+    return _claim_next_samples(
+        reviewer_id=reviewer_id,
+        count=count,
+        include_reviewed=include_reviewed,
+        exclude=exclude,
+    )
 @app.get("/image/{filename}")
 def get_image(filename: str, _: str = Depends(verify_key)) -> RedirectResponse:
     if "/" in filename or "\\" in filename:
