@@ -121,6 +121,7 @@ Todas as rotas de negócio validam `?key=` com `SECRET_KEY`.
 ### Vercel (frontend)
 
 - Publique o projeto estático
+- O arquivo `vercel.json` já força deploy estático de `index.html` (evita erro `FUNCTION_INVOCATION_FAILED`)
 - Em `index.html`, ajuste:
 
 ```js
